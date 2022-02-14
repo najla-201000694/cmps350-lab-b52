@@ -99,7 +99,7 @@ section.hero_section .avatar_user img{
     float: right;
 }
 section.hero_section .intro button{
-    background-color: #e74f4f;
+    background-color: #438c3e;
     padding: 12px 33px;
     color: #fff;
     font-size: 15px;
@@ -109,7 +109,7 @@ section.hero_section .intro button{
 
 
 section.post_section{
-    background-color: #b4dfef;
+    background-color: #a3b281;
     margin-top: 70px;
     padding: 64px;
 }
