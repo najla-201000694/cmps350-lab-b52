@@ -31,3 +31,8 @@ console.table(a);
 
 a[1000] = 'a';
 console.table(a);
+
+let AvgArrow = function ( a, b) {
+
+
+}
