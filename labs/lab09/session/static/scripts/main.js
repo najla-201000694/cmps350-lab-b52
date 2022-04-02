@@ -1,4 +1,6 @@
-document.addEventListener("DOMContentLoaded", () => {
+import repository from "./repository.js";
+
+document.addEventListener("DOMContentLoaded", async () => {
   if (localStorage.theme === "dark") {
     document.documentElement.classList.add("dark");
   }
@@ -17,13 +19,39 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const newAccountFormElement = document.querySelector("#new-account-form");
   if (newAccountFormElement) {
-    newAccountFormElement.addEventListener("submit", async (e) => await createAccount(e));
-    document.querySelector("#account-type").addEventListener("change", (e) => changeAccountType(e))
+    newAccountFormElement.addEventListener("submit", async (event) => await createAccount(event));
+    document.querySelector("#account-type").addEventListener("change", (event) => changeAccountType(event));
+  }
+
+  const newTransactionFormElement = document.querySelector("#new-transaction-form");
+  if (newTransactionFormElement) {
+    const accounts = await fetchAccounts("all");
+
+    accounts.map(account => account.id).forEach((id) => {
+      const accountOption = document.createElement("option");
+      accountOption.value = id;
+      accountOption.innerText = id;
+      document.querySelector("#transaction-account").appendChild(accountOption);
+    });
+
+    newTransactionFormElement.addEventListener("submit", async (event) => await createTransaction(event));
   }
 });
 
-async function createAccount(e) {
-  e.preventDefault();
+function changeAccountType(event) {
+  const value = document.querySelector("#account-type").value;
+
+  document.querySelector("#account-monthly-fee-label").hidden = value !== "current";
+  document.querySelector("#account-monthly-fee").hidden = value !== "current";
+  // document.querySelector("#account-monthly-fee").required = value === "current";
+
+  document.querySelector("#account-minimum-balance-label").hidden = value !== "savings";
+  document.querySelector("#account-minimum-balance").hidden = value !== "savings";
+  document.querySelector("#account-minimum-balance").required = value === "savings";
+}
+
+async function createAccount(event) {
+  event.preventDefault();
 
   const formData = new FormData(document.querySelector("#new-account-form"));
   const fields = Object.fromEntries(formData.entries());
@@ -34,45 +62,43 @@ async function createAccount(e) {
     monthlyFee: fields["account-monthly-fee"],
   };
 
-  const response = await fetch(urlPathQuery("/api/accounts", {}), {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json; charset=utf-8"
-    },
-    body: JSON.stringify(account),
-  });
-  const data = await response.json();
-
+  const data = await repository.createAccount(account);
   document.querySelector("#new-account-form").reset();
 }
 
-function changeAccountType(e) {
-  const value = document.querySelector("#account-type").value;
-  document.querySelector("#account-monthly-fee-label").hidden = value !== "current";
-  document.querySelector("#account-monthly-fee").hidden = value !== "current";
-  document.querySelector("#account-monthly-fee").required = value === "current";
-  document.querySelector("#account-minimum-balance-label").hidden = value !== "savings";
-  document.querySelector("#account-minimum-balance").hidden = value !== "savings";
-  document.querySelector("#account-minimum-balance").required = value === "savings";
-}
-
-async function fetchRenderAccounts(type) {
-  const data = await fetchAccounts(type);
-
-  document.querySelector("#accounts-table > tbody").replaceChildren();
-  data.forEach(renderAccount);
-}
-
-function urlPathQuery(path, query) {
-  const url = new URL([location.protocol, "//", location.host, path].join(""));
-  url.search = new URLSearchParams(query).toString();
-  return url;
+async function deleteAccount(event, id) {
+  const result = await repository.deleteAccount(id);
+  document.querySelector(`tr[data-id="${id}"]`).remove();
 }
 
 async function fetchAccounts(type) {
-  const response = await fetch(urlPathQuery("/api/accounts", { type: type }), { method: 'GET' });
-  const data = await response.json();
-  return data;
+  return await repository.readAccounts(type);
+}
+
+async function fetchRenderAccounts(type) {
+  const accounts = await fetchAccounts(type);
+
+  document.querySelector("#accounts-table > tbody").replaceChildren();
+  // document.querySelector("#accounts-table > tbody").innerHTML = "";
+  accounts.forEach(renderAccount);
+}
+
+async function createTransaction(event) {
+  event.preventDefault();
+
+  const formData = new FormData(document.querySelector("#new-transaction-form"));
+  const fields = Object.fromEntries(formData.entries());
+  const transaction = {
+    type: fields["transaction-type"],
+    amount: fields["transaction-amount"],
+  };
+
+  const result = await repository.createTransaction(fields["transaction-account"], transaction);
+  if (typeof result === "string" || result instanceof String) {
+    alert(result);
+  }
+
+  document.querySelector("#new-transaction-form").reset();
 }
 
 function renderAccount(account) {
@@ -86,30 +112,24 @@ function renderAccount(account) {
     element.innerText = account[key];
     accountElement.appendChild(element);
   }
+  // accountElement.innerHTML = `<td>${account.id}</td><td>${account.type}</td><td>${account.balance}</td>`;
 
   const actionsElement = document.createElement("td");
   actionsElement.classList.add("account-actions");
 
   const updateActionElement = document.createElement("i");
   updateActionElement.classList.add("account-action", "fa", "fa-edit");
-  updateActionElement.addEventListener("click", async (e) => {});
+  // updateActionElement.addEventListener("click", async (event) => {});
   actionsElement.appendChild(updateActionElement);
 
   if (account.balance === 0) {
     const deleteActionElement = document.createElement("i");
     deleteActionElement.classList.add("account-action", "fa", "fa-trash");
-    deleteActionElement.addEventListener("click", async (e) => { await deleteAccount(e, account.id) });
+    deleteActionElement.addEventListener("click", async (event) => await deleteAccount(event, account.id));
     actionsElement.appendChild(deleteActionElement);
   }
 
   accountElement.appendChild(actionsElement);
 
   document.querySelector("#accounts-table > tbody").appendChild(accountElement);
-}
-
-async function deleteAccount(e, id) {
-  const response = await fetch(urlPathQuery(`/api/accounts/${id}`, {}), {
-    method: "DELETE",
-  });
-  document.querySelector(`tr[data-id="${id}"]`).remove();
 }
